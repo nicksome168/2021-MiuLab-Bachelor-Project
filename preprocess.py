@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+import unicodedata
 
 import pandas as pd
 
@@ -9,14 +10,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--data_path",
         type=Path,
-        # default="data/risk_classification/train.csv",
-        default="data/qa/train.json",
+        default="data/risk_classification/train.csv",
+        # default="data/qa/train.json",
     )
     parser.add_argument(
         "--output_path",
         type=Path,
-        # default="data/risk_classification/processed_train.csv",
-        default="data/qa/processed_train.json",
+        default="data/risk_classification/processed_train.csv",
+        # default="data/qa/processed_train.json",
     )
     args = parser.parse_args()
 
@@ -33,6 +34,8 @@ if __name__ == "__main__":
     df["text"] = df["text"].apply(lambda text: text.replace("家屬：", "家："))
     df["text"] = df["text"].apply(lambda text: text.replace("……", "⋯"))
     df["text"] = df["text"].apply(lambda text: text.replace("⋯⋯", "⋯"))
+    df["text"] = df["text"].apply(lambda text: unicodedata.normalize("NFKC", text))
+    
     print(df["text"].str.len().mean())
     # print(df["text"].str.len().max())
 

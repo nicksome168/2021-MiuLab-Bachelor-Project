@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
 from torch import nn, Tensor
-from transformers import AutoModelForSequenceClassification, BatchEncoding
+from transformers import AutoModelForSequenceClassification
 
 
 class BaseModel(nn.Module, ABC):
@@ -25,8 +25,27 @@ class RiskClassificationModel(BaseModel):
         super().__init__()
         self._model = AutoModelForSequenceClassification.from_pretrained(model_name)
 
-    def forward(self, x: BatchEncoding, labels: Tensor = None) -> tuple:
-        y = self._model(**x, labels=labels)
+    def forward(self, input_ids: Tensor, labels: Tensor = None) -> tuple:
+        y = self._model(input_ids=input_ids, labels=labels)
+        if labels is not None:
+            loss, logits = y[:2]
+            return loss, logits
+        else:
+            logits = y[0]
+            return logits
+
+
+class MultiTaskModel(BaseModel):
+    def __init__(self, model_name):
+        super().__init__()
+        self._model_dict = nn.ModuleDict({
+            "rc": AutoModelForSequenceClassification.from_pretrained(model_name),
+            "qa": AutoModelForSequenceClassification.from_pretrained(model_name),
+        })
+        self._model_dict["qa"].transformer = self._model_dict["rc"].transformer
+    
+    def forward(self, task: str, input_ids: Tensor, labels: Tensor = None):
+        y = self._model_dict[task](input_ids=input_ids, labels=labels)
         if labels is not None:
             loss, logits = y[:2]
             return loss, logits

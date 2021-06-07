@@ -4,40 +4,29 @@ from pathlib import Path
 
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from transformers import XLNetTokenizerFast
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score
 
-from utils import handle_reproducibility
+from utils import handle_reproducibility, preprocess
 from dataset import RiskClassificationDataset
 from model import RiskClassificationModel
 
 
 def train(args: argparse.Namespace) -> None:
     df = pd.read_csv(args.data_dir / "train.csv", usecols=["article_id", "text", "label"])
+    df = preprocess(df)
 
     valid_ratio = 0.1
     valid_df = df.sample(frac=valid_ratio, random_state=0)
     train_df = df.drop(valid_df.index).reset_index(drop=True)
     valid_df = valid_df.reset_index(drop=True)
-    
-    train_add_list = []
-    for i in range(len(train_df)):
-        pg = train_df.loc[i, "text"]
-        if len(pg) > 2000:
-            train_df.loc[i, "text"] = pg[:2048]
-            train_add_list.append({
-                "text": pg[-2048:],
-                "label": train_df.loc[i, "label"],
-            })
-    train_df = train_df.append(train_add_list, ignore_index=True)
-    # print(train_df)
-    # return
 
-    train_set = RiskClassificationDataset(train_df, mode="train")
-    valid_set = RiskClassificationDataset(valid_df, mode="valid")
+    tokenizer = XLNetTokenizerFast.from_pretrained(args.model_name)
+    train_set = RiskClassificationDataset(train_df, tokenizer, mode="train")
+    valid_set = RiskClassificationDataset(valid_df, tokenizer, mode="valid")
 
     train_loader = DataLoader(
         train_set,
@@ -48,13 +37,12 @@ def train(args: argparse.Namespace) -> None:
     )
     valid_loader = DataLoader(
         valid_set,
-        batch_size=args.batch_size,
+        batch_size=args.batch_size*4,
         shuffle=False,
         num_workers=16,
         pin_memory=True,
     )
 
-    tokenizer = XLNetTokenizerFast.from_pretrained(args.model_name)
     model = RiskClassificationModel(args.model_name)
     model.to(args.device)
 
@@ -69,25 +57,18 @@ def train(args: argparse.Namespace) -> None:
 
     best_metric = 0
     for epoch in range(1, args.n_epoch + 1):
+        # torch.cuda.empty_cache()
         print(f"----- Epoch {epoch} -----")
 
         model.train()
         optimizer.zero_grad()
         train_loss = 0
         train_corrects = 0
-        for batch_idx, (seq, label) in enumerate(tqdm(train_loader)):
-            seq_tok = tokenizer(
-                list(seq),
-                padding="max_length",
-                truncation=True,
-                max_length=2048,
-                return_tensors="pt",
-            )
-
-            seq_tok = seq_tok.to(args.device)
+        for batch_idx, (input, label) in enumerate(tqdm(train_loader)):
+            input = input.to(args.device)
             label = label.to(args.device)
 
-            loss, logits = model(seq_tok, label)
+            loss, logits = model(input, label)
             
             loss.backward()
             if (batch_idx + 1) % args.n_batch_per_step == 0:
@@ -106,34 +87,27 @@ def train(args: argparse.Namespace) -> None:
             print(f"{key:30s}: {value:.4}")
         
         # Validation
+        torch.cuda.empty_cache()
         with torch.no_grad():
             model.eval()
             valid_loss = 0
             valid_corrects = 0
             valid_labels = []
             valid_scores = []
-            for seq, label in tqdm(valid_loader):
-                seq_tok = tokenizer(
-                    list(seq),
-                    padding="max_length",
-                    truncation=True,
-                    max_length=4096,
-                    return_tensors="pt",
-                )
-
-                seq_tok = seq_tok.to(args.device)
+            for input, label in tqdm(valid_loader):
+                input = input.to(args.device)
                 label = label.to(args.device)
 
-                loss, logits = model(seq_tok, label)
+                loss, logits = model(input, label)
 
                 valid_loss += loss.item()
                 pred = torch.argmax(logits, dim=1)
                 valid_corrects += torch.sum(pred == label)
-                valid_labels.append(label.cpu().squeeze())
-                valid_scores.append(logits.cpu()[:, 1].squeeze())
+                valid_labels.append(label.cpu().view(-1))
+                valid_scores.append(logits.cpu()[:, 1].view(-1))
 
-            valid_labels = torch.stack(valid_labels)
-            valid_scores = torch.stack(valid_scores)
+            valid_labels = torch.cat(valid_labels)
+            valid_scores = torch.cat(valid_scores)
             valid_log = {
                 "valid_loss": valid_loss / len(valid_set),
                 "valid_acc": valid_corrects / len(valid_set),
@@ -164,12 +138,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data_dir",
         type=Path,
-        default="data/risk_classification/",
+        default="data/rc/",
     )
     parser.add_argument(
         "--ckpt_dir",
         type=Path,
-        default="ckpt/risk_classification/",
+        default="ckpt/rc/",
     )
 
     # model
@@ -183,13 +157,14 @@ def parse_args() -> argparse.Namespace:
 
     # training
     parser.add_argument("--device", type=torch.device, default="cuda:0")
-    parser.add_argument("--n_epoch", type=int, default=50)
+    parser.add_argument("--n_epoch", type=int, default=20)
     parser.add_argument("--n_batch_per_step", type=int, default=16)
     parser.add_argument("--metric_for_best", type=str, default="valid_auroc")
 
     # logging
-    parser.add_argument("--wandb_logging", type=bool, default=True)
-    parser.add_argument("--exp_name", type=str, default="xlnet-2048-fb")
+    parser.add_argument("--wandb_logging", type=bool, default=False)
+    # parser.add_argument("--exp_name", type=str, default="xlnet-2048-fb-new")
+    parser.add_argument("--exp_name", type=str, default="test")
 
     args = parser.parse_args()
     return args
@@ -203,3 +178,7 @@ if __name__ == "__main__":
     args.ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     train(args)
+
+# 後面4096
+# 修資料
+# 全形
