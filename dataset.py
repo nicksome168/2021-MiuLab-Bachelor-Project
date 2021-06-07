@@ -10,7 +10,7 @@ class RiskClassificationDataset(Dataset):
             add_list = []
             for i in range(len(df)):
                 pg = df.loc[i, "text"]
-                if len(pg) > 2048:
+                if len(pg) > 2000:
                     df.loc[i, "text"] = pg[:2048]
                     add_list.append({
                         "text": pg[-2048:],
@@ -24,36 +24,43 @@ class RiskClassificationDataset(Dataset):
     
     def _tokenize(self, text):
         if self._mode == "train":
-            tok_text = self._tokenizer(
+            tok = self._tokenizer(
                 text,
                 padding="max_length",
                 truncation=True,
                 max_length=2048,
                 return_tensors="pt",
-            ).input_ids.squeeze()
-            return tok_text
+            )
+            return (
+                tok.input_ids.view(-1),
+                tok.token_type_ids.view(-1),
+                tok.attention_mask.view(-1),
+            )
         else:  # mode == "valid" or "test"
-            tok_text = self._tokenizer(
+            tok = self._tokenizer(
                 text,
                 padding="max_length",
                 truncation=False,
                 max_length=4096,
                 return_tensors="pt",
-            ).input_ids.squeeze()
-            # return tok_text[-4096:]
-            return tok_text[:4096]
+            )
+            return (
+                tok.input_ids.view(-1)[:4096],
+                tok.token_type_ids.view(-1)[:4096],
+                tok.attention_mask.view(-1)[:4096],
+            )
 
     def __len__(self) -> int:
         return len(self._df)
 
     def __getitem__(self, idx: int) -> tuple:
         instance = self._df.iloc[idx]
-        pg = self._tokenize(instance["text"])
+        tok = self._tokenize(instance["text"])
 
         if self._mode == "train" or self._mode == "valid":
-            return pg, instance["label"]
+            return *tok, instance["label"]
         else:  # mode == "test"
-            return pg, instance["article_id"]
+            return *tok, instance["article_id"]
 
 class QADataset(Dataset):
     def __init__(self, df: DataFrame, tokenizer: XLNetTokenizerFast, mode: str):

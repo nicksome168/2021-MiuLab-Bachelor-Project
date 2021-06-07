@@ -41,10 +41,16 @@ def test(args):
 
     pred_score_list = []
     id_list = []
-    for pg, id in tqdm(data_loader):
-        pg = pg.to(args.device)
+    for input_ids, token_type_ids, attention_mask, id in tqdm(data_loader):
+        input_ids = input_ids.to(args.device)
+        token_type_ids = token_type_ids.to(args.device)
+        attention_mask = attention_mask.to(args.device)
 
-        logits = model(pg)
+        logits = model({
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "attention_mask": attention_mask,
+        })
         score = torch.sigmoid(logits)
 
         pred_score_list.append(score.cpu()[:, 1].view(-1))

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Dict
 
 from torch import nn, Tensor
 from transformers import AutoModelForSequenceClassification
@@ -25,8 +26,8 @@ class RiskClassificationModel(BaseModel):
         super().__init__()
         self._model = AutoModelForSequenceClassification.from_pretrained(model_name)
 
-    def forward(self, input_ids: Tensor, labels: Tensor = None) -> tuple:
-        y = self._model(input_ids=input_ids, labels=labels)
+    def forward(self, inputs: Dict, labels: Tensor = None) -> tuple:
+        y = self._model(**inputs, labels=labels)
         if labels is not None:
             loss, logits = y[:2]
             return loss, logits

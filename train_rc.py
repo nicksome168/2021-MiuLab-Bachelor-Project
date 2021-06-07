@@ -17,7 +17,7 @@ from model import RiskClassificationModel
 
 def train(args: argparse.Namespace) -> None:
     df = pd.read_csv(args.data_dir / "train.csv", usecols=["article_id", "text", "label"])
-    df = preprocess(df)
+    # df = preprocess(df)
 
     valid_ratio = 0.1
     valid_df = df.sample(frac=valid_ratio, random_state=0)
@@ -37,7 +37,7 @@ def train(args: argparse.Namespace) -> None:
     )
     valid_loader = DataLoader(
         valid_set,
-        batch_size=args.batch_size*4,
+        batch_size=args.batch_size*2,
         shuffle=False,
         num_workers=16,
         pin_memory=True,
@@ -64,11 +64,20 @@ def train(args: argparse.Namespace) -> None:
         optimizer.zero_grad()
         train_loss = 0
         train_corrects = 0
-        for batch_idx, (input, label) in enumerate(tqdm(train_loader)):
-            input = input.to(args.device)
+        for batch_idx, (input_ids, token_type_ids, attention_mask, label) in enumerate(tqdm(train_loader)):
+            input_ids = input_ids.to(args.device)
+            token_type_ids = token_type_ids.to(args.device)
+            attention_mask = attention_mask.to(args.device)
             label = label.to(args.device)
 
-            loss, logits = model(input, label)
+            loss, logits = model(
+                {
+                    "input_ids": input_ids,
+                    "token_type_ids": token_type_ids,
+                    "attention_mask": attention_mask,
+                },
+                label
+            )
             
             loss.backward()
             if (batch_idx + 1) % args.n_batch_per_step == 0:
@@ -94,11 +103,20 @@ def train(args: argparse.Namespace) -> None:
             valid_corrects = 0
             valid_labels = []
             valid_scores = []
-            for input, label in tqdm(valid_loader):
-                input = input.to(args.device)
+            for input_ids, token_type_ids, attention_mask, label in tqdm(valid_loader):
+                input_ids = input_ids.to(args.device)
+                token_type_ids = token_type_ids.to(args.device)
+                attention_mask = attention_mask.to(args.device)
                 label = label.to(args.device)
 
-                loss, logits = model(input, label)
+                loss, logits = model(
+                    {
+                        "input_ids": input_ids,
+                        "token_type_ids": token_type_ids,
+                        "attention_mask": attention_mask,
+                    },
+                    label
+                )
 
                 valid_loss += loss.item()
                 pred = torch.argmax(logits, dim=1)
@@ -162,9 +180,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--metric_for_best", type=str, default="valid_auroc")
 
     # logging
-    parser.add_argument("--wandb_logging", type=bool, default=False)
-    # parser.add_argument("--exp_name", type=str, default="xlnet-2048-fb-new")
-    parser.add_argument("--exp_name", type=str, default="test")
+    parser.add_argument("--wandb_logging", type=bool, default=True)
+    parser.add_argument("--exp_name", type=str, default="xlnet-2048-fb")
+    # parser.add_argument("--exp_name", type=str, default="test")
 
     args = parser.parse_args()
     return args
@@ -178,7 +196,3 @@ if __name__ == "__main__":
     args.ckpt_dir.mkdir(parents=True, exist_ok=True)
 
     train(args)
-
-# 後面4096
-# 修資料
-# 全形
