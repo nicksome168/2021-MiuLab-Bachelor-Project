@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict
 
 from torch import nn, Tensor
-from transformers import AutoModelForSequenceClassification
+from transformers import AutoModelForSequenceClassification, AutoModelForMultipleChoice
 
 
 class BaseModel(nn.Module, ABC):
@@ -41,12 +41,12 @@ class MultiTaskModel(BaseModel):
         super().__init__()
         self._model_dict = nn.ModuleDict({
             "rc": AutoModelForSequenceClassification.from_pretrained(model_name),
-            "qa": AutoModelForSequenceClassification.from_pretrained(model_name),
+            "qa": AutoModelForMultipleChoice.from_pretrained(model_name),
         })
         self._model_dict["qa"].transformer = self._model_dict["rc"].transformer
     
-    def forward(self, task: str, input_ids: Tensor, labels: Tensor = None):
-        y = self._model_dict[task](input_ids=input_ids, labels=labels)
+    def forward(self, task: str, inputs: Dict, labels: Tensor = None):
+        y = self._model_dict[task](**inputs, labels=labels)
         if labels is not None:
             loss, logits = y[:2]
             return loss, logits
