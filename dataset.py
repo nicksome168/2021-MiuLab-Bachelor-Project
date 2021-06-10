@@ -113,4 +113,4 @@ class QADataset(Dataset):
                 raise Exception
             return *tok, ans
         else:  # mode == "test"
-            return *tok, instance["article_id"]
+            return *tok, instance["id"]

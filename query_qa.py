@@ -43,15 +43,18 @@ class Dataset():
             for pg in pg_list_tmp:
                 i = 0
                 curr_start_idx = 0
-                for idx in range(len(pg)):
-                    if i >= 300 and pg[idx] in [",", "?", "。", "⋯"]:
-                        pg_list.append(pg[curr_start_idx : idx + 1])
-                        i = 0
-                        curr_start_idx = idx + 1
-                    elif idx == len(pg) - 1:
-                        pg_list.append(pg[curr_start_idx:])
-                    else:
-                        i += 1
+                if len(pg) > 300:
+                    for idx in range(len(pg)):
+                        if i >= 300 and pg[idx] in [",", "?", "。", "⋯"]:
+                            pg_list.append(pg[curr_start_idx : idx + 1])
+                            i = 0
+                            curr_start_idx = idx + 1
+                        elif idx == len(pg) - 1:
+                            pg_list.append(pg[curr_start_idx:])
+                        else:
+                            i += 1
+                else:
+                    pg_list.append(pg)
             # [print(pg) for pg in pg_list]
             
             pg_word_list = ws(pg_list, coerce_dictionary=dictionary)
@@ -121,18 +124,22 @@ if __name__ == "__main__":
     ws = init_ws(ckip_download_dir=Path("ckpt/ckip/"))
 
     data_dir = Path("data/qa/")
-    train_df = pd.read_json(data_dir / "train.json", orient="records")
-    # dev_df = pd.read_json(data_dir / "dev.csv", orient="records")
-    df = train_df
+    # train_df = pd.read_json(data_dir / "train.json", orient="records")
+    dev_df = pd.read_json(data_dir / "dev.json", orient="records")
+    # df = train_df.append(dev_df)
+    # df = train_df
+    df = dev_df
     df = preprocess(df)
     
+    model_dir = Path("ckpt/bm25/")
+    model_name = "model_dev_pg0s300.pkl"
+
+    # Constuct new model
     # dataset = Dataset(df, ws)
-
-    # model_dir = Path("ckpt/bm25/")
     # model_dir.mkdir(parents=True, exist_ok=True)
-    # dataset.save(model_dir / "model.pkl")
-
-    dataset = Dataset.from_pretrained("ckpt/bm25/model.pkl", ws)
+    # dataset.save(model_dir / model_name)
+    # Load existing model
+    dataset = Dataset.from_pretrained(model_dir / model_name, ws)
 
     for row_i, row in tqdm(df.iterrows(), total=len(df)):
         article_id = row["article_id"]
@@ -159,10 +166,10 @@ if __name__ == "__main__":
                 ret_pg += "".join(pg)
         
         df.loc[row_i, "text"] = ret_pg
-        # if len(ret_pg) > 1000:
-        #     print(row["question"])
-        #     print(len(ret_pg))
-        #     print(ret_pg)
+        if len(ret_pg) > 1000:
+            print(row["question"])
+            print(len(ret_pg))
+            print(ret_pg)
         # exit()
 
-    df.to_json(data_dir / "processed_train.json", orient="records", force_ascii=False, indent=4)
+    df.to_json(data_dir / "processed_dev.json", orient="records", force_ascii=False, indent=4)

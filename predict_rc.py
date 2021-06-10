@@ -14,7 +14,7 @@ from model import RiskClassificationModel
 
 
 @torch.no_grad()
-def test(args):
+def predict(args):
     df = pd.read_csv(args.data_path, usecols=["article_id", "text", "label"])
     # df = preprocess(df)
 
@@ -89,4 +89,4 @@ if __name__ == "__main__":
 
     args = parse_args()
 
-    test(args)
+    predict(args)

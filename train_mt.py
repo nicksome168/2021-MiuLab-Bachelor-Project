@@ -25,9 +25,10 @@ def train(args: argparse.Namespace) -> None:
     valid_rc_df = rc_df.sample(frac=valid_ratio, random_state=0)
     train_rc_df = rc_df.drop(valid_rc_df.index).reset_index(drop=True)
     valid_rc_df = valid_rc_df.reset_index(drop=True)
-    valid_qa_df = qa_df.sample(frac=valid_ratio, random_state=0)
-    train_qa_df = qa_df.drop(valid_qa_df.index).reset_index(drop=True)
-    valid_qa_df = valid_qa_df.reset_index(drop=True)
+    qa_df = qa_df.set_index("article_id")
+    valid_qa_df = qa_df.loc[valid_rc_df["article_id"]]
+    train_qa_df = qa_df.drop(valid_qa_df.index).reset_index()
+    valid_qa_df = valid_qa_df.reset_index()
     
     tokenizer = XLNetTokenizerFast.from_pretrained(args.model_name)
     train_rc_set = RiskClassificationDataset(train_rc_df, tokenizer, mode="train")
@@ -109,30 +110,30 @@ def train(args: argparse.Namespace) -> None:
 
             rc_loss.backward()
 
-            try:
-                qa_input_ids, qa_token_type_ids, qa_attention_mask, qa_label = next(train_qa_iter)
-            except StopIteration:
-                train_qa_iter = iter(train_qa_loader)
-                qa_input_ids, qa_token_type_ids, qa_attention_mask, qa_label = next(train_qa_iter)
+            for _ in range(args.n_qa_per_rc):
+                try:
+                    qa_input_ids, qa_token_type_ids, qa_attention_mask, qa_label = next(train_qa_iter)
+                except StopIteration:
+                    train_qa_iter = iter(train_qa_loader)
+                    qa_input_ids, qa_token_type_ids, qa_attention_mask, qa_label = next(train_qa_iter)
 
-            qa_input_ids = qa_input_ids.to(args.device)
-            qa_token_type_ids = qa_token_type_ids.to(args.device)
-            qa_attention_mask = qa_attention_mask.to(args.device)
-            qa_label = qa_label.to(args.device)
+                qa_input_ids = qa_input_ids.to(args.device)
+                qa_token_type_ids = qa_token_type_ids.to(args.device)
+                qa_attention_mask = qa_attention_mask.to(args.device)
+                qa_label = qa_label.to(args.device)
 
-            qa_loss, qa_logits = model(
-                "qa",
-                {
-                    "input_ids": qa_input_ids,
-                    "token_type_ids": qa_token_type_ids,
-                    "attention_mask": qa_attention_mask,
-                },
-                qa_label,
-            )
-            
-            qa_loss.backward()
-            # loss = rc_loss + qa_loss
-            # loss.backward()
+                qa_loss, qa_logits = model(
+                    "qa",
+                    {
+                        "input_ids": qa_input_ids,
+                        "token_type_ids": qa_token_type_ids,
+                        "attention_mask": qa_attention_mask,
+                    },
+                    qa_label,
+                )
+                
+                qa_loss.backward()
+
             if (batch_idx + 1) % args.n_batch_per_step == 0:
                 optimizer.step()
                 optimizer.zero_grad()
@@ -267,11 +268,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", type=torch.device, default="cuda:0")
     parser.add_argument("--n_epoch", type=int, default=40)
     parser.add_argument("--n_batch_per_step", type=int, default=16)
+    parser.add_argument("--n_qa_per_rc", type=int, default=2)
     parser.add_argument("--metric_for_best", type=str, default="valid_qa_acc")
 
     # logging
     parser.add_argument("--wandb_logging", type=bool, default=True)
-    parser.add_argument("--exp_name", type=str, default="xlnet-mt")
+    parser.add_argument("--exp_name", type=str, default="xlnet-mt-qpr2")
     # parser.add_argument("--exp_name", type=str, default="test")
 
     args = parser.parse_args()
