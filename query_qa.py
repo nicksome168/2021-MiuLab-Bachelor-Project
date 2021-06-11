@@ -21,9 +21,8 @@ class Dataset():
         if from_pretrained:
             return
         self._doc = {}  # article_id -> pg_word_list
-        self._df = {}  # word -> df
-        self._avg_dl = 0
-        self._n_doc = 0
+        self._df = {}  # article_id -> word -> df
+        self._avg_dl = {}  # article_id -> dl
         self._ws = ws
 
         dictionary = construct_dictionary({
@@ -57,19 +56,20 @@ class Dataset():
                     pg_list.append(pg)
             # [print(pg) for pg in pg_list]
             
+            self._df[article_id] = {}
+            self._avg_dl[article_id] = 0
             pg_word_list = ws(pg_list, coerce_dictionary=dictionary)
             for word_list in pg_word_list:
-                self._avg_dl += len(word_list)
-                self._n_doc += 1
+                self._avg_dl[article_id] += len(word_list)
                 for word in word_list:
-                    if word in self._df:
-                        self._df[word] += 1
+                    if word in self._df[article_id]:
+                        self._df[article_id][word] += 1
                     else:
-                        self._df[word] = 1
+                        self._df[article_id][word] = 1
                 # print(word_list)
             self._doc[article_id] = pg_word_list
 
-        self._avg_dl /= self._n_doc
+            self._avg_dl[article_id] /= len(pg_list)
         # print(self._avg_dl)
 
     def query(self, article_id, text):
@@ -84,16 +84,17 @@ class Dataset():
             dl = len(pg)
             for q_word in q:
                 tf = pg.count(q_word)
-                df = self._df.get(q_word, 0)
-                idf = math.log((self._n_doc - df + 0.5) / (df + 0.5) + 1)
-                score += idf * ((tf * (k + 1)) / (tf + k * (1 - b + b * dl / self._avg_dl)))
+                df = self._df[article_id].get(q_word, 0)
+                idf = math.log((len(pg_list) - df + 0.5) / (df + 0.5) + 1)
+                score += idf * ((tf * (k + 1)) / (tf + k * (1 - b + b * dl / self._avg_dl[article_id])))
             score_list.append(score)
 
         sorted_list = sorted(zip(score_list, enumerate(pg_list)), key=lambda k: k[0], reverse=True)
         # print(text)
+        # print(q)
         # [print(score, "".join(pg)) for score, (idx, pg) in sorted_list[:5]]
 
-        return [idx for score, (idx, pg) in sorted_list[:2]]
+        return [idx for score, (idx, pg) in sorted_list[:3]]
 
     def get_pg_list(self, article_id):
         return self._doc[article_id]
@@ -105,7 +106,6 @@ class Dataset():
                     "_doc": self._doc,
                     "_df": self._df,
                     "_avg_dl": self._avg_dl,
-                    "_n_doc": self._n_doc,
                 },
                 file
             )
@@ -125,19 +125,22 @@ if __name__ == "__main__":
 
     data_dir = Path("data/qa/")
     # train_df = pd.read_json(data_dir / "train.json", orient="records")
+    # train_df["article_id"] = train_df["article_id"].apply(lambda id: f"train_{id}")
     dev_df = pd.read_json(data_dir / "dev.json", orient="records")
+    dev_df["article_id"] = dev_df["article_id"].apply(lambda id: f"dev_{id}")
     # df = train_df.append(dev_df)
     # df = train_df
     df = dev_df
     df = preprocess(df)
     
     model_dir = Path("ckpt/bm25/")
-    model_name = "model_dev_pg0s300.pkl"
+    model_name = "model_new_dev_300.pkl"
 
     # Constuct new model
     # dataset = Dataset(df, ws)
     # model_dir.mkdir(parents=True, exist_ok=True)
     # dataset.save(model_dir / model_name)
+    # exit()
     # Load existing model
     dataset = Dataset.from_pretrained(model_dir / model_name, ws)
 
@@ -157,7 +160,7 @@ if __name__ == "__main__":
                 # idx_table[idx - 2] = 1
                 # idx_table[idx - 1] = 1
                 idx_table[idx] = 1
-                # idx_table[idx + 1] = 1
+                idx_table[idx + 1] = 1
                 # idx_table[idx + 2] = 1
 
         ret_pg = ""
