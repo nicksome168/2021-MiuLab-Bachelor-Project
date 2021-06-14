@@ -42,9 +42,9 @@ class Dataset():
             for pg in pg_list_tmp:
                 i = 0
                 curr_start_idx = 0
-                if len(pg) > 300:
+                if len(pg) > 200:
                     for idx in range(len(pg)):
-                        if i >= 300 and pg[idx] in [",", "?", "。", "⋯"]:
+                        if i >= 200 and pg[idx] in [",", "?", "。", "⋯"]:
                             pg_list.append(pg[curr_start_idx : idx + 1])
                             i = 0
                             curr_start_idx = idx + 1
@@ -124,17 +124,17 @@ if __name__ == "__main__":
     ws = init_ws(ckip_download_dir=Path("ckpt/ckip/"))
 
     data_dir = Path("data/qa/")
-    # train_df = pd.read_json(data_dir / "train.json", orient="records")
+    train_df = pd.read_json(data_dir / "train.json", orient="records")
     # train_df["article_id"] = train_df["article_id"].apply(lambda id: f"train_{id}")
-    dev_df = pd.read_json(data_dir / "dev.json", orient="records")
-    dev_df["article_id"] = dev_df["article_id"].apply(lambda id: f"dev_{id}")
+    # dev_df = pd.read_json(data_dir / "dev.json", orient="records")
+    # dev_df["article_id"] = dev_df["article_id"].apply(lambda id: f"dev_{id}")
     # df = train_df.append(dev_df)
-    # df = train_df
-    df = dev_df
+    df = train_df
+    # df = dev_df
     df = preprocess(df)
     
     model_dir = Path("ckpt/bm25/")
-    model_name = "model_new_dev_300.pkl"
+    model_name = "model_new_train_300.pkl"
 
     # Constuct new model
     # dataset = Dataset(df, ws)
@@ -158,21 +158,29 @@ if __name__ == "__main__":
 
             for idx in idx_list:
                 # idx_table[idx - 2] = 1
-                # idx_table[idx - 1] = 1
+                idx_table[idx - 1] = 2
                 idx_table[idx] = 1
                 idx_table[idx + 1] = 1
-                # idx_table[idx + 2] = 1
+                idx_table[idx + 2] = 3
 
         ret_pg = ""
-        for idx, pg in enumerate(dataset.get_pg_list(article_id)):
-            if idx in idx_table:
-                ret_pg += "".join(pg)
-        
+        for ord in [1, 2, 3]:
+            cand_pg = ""
+            for idx, pg in enumerate(dataset.get_pg_list(article_id)):
+                if idx in idx_table and idx_table[idx] <= ord:
+                    cand_pg += "".join(pg)
+            if ord == 1:
+                ret_pg = cand_pg
+                continue
+            if len(cand_pg) > 1000:
+                break
+            ret_pg = cand_pg
+            # print(len(ret_pg))
+
         df.loc[row_i, "text"] = ret_pg
         if len(ret_pg) > 1000:
             print(row["question"])
             print(len(ret_pg))
             print(ret_pg)
-        # exit()
 
-    df.to_json(data_dir / "processed_dev.json", orient="records", force_ascii=False, indent=4)
+    df.to_json(data_dir / "processed_train_new_300_c3.json", orient="records", force_ascii=False, indent=4)
