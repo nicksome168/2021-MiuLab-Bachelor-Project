@@ -76,7 +76,7 @@ class QADataset(Dataset):
             q_opt,
             padding="max_length",
             truncation=True,
-            max_length=1024,
+            max_length=512,
             return_tensors="pt",
         )
         return (

@@ -27,6 +27,7 @@ class Dataset():
 
         dictionary = construct_dictionary({
             "個管師": 1,
+            ":": 1,
         })
 
         for _, doc in tqdm(df.iterrows(), total=len(df)):
@@ -42,9 +43,9 @@ class Dataset():
             for pg in pg_list_tmp:
                 i = 0
                 curr_start_idx = 0
-                if len(pg) > 200:
+                if len(pg) > 150:
                     for idx in range(len(pg)):
-                        if i >= 200 and pg[idx] in [",", "?", "。", "⋯"]:
+                        if i >= 150 and pg[idx] in [",", "?", "。", "⋯"]:
                             pg_list.append(pg[curr_start_idx : idx + 1])
                             i = 0
                             curr_start_idx = idx + 1
@@ -94,7 +95,7 @@ class Dataset():
         # print(q)
         # [print(score, "".join(pg)) for score, (idx, pg) in sorted_list[:5]]
 
-        return [idx for score, (idx, pg) in sorted_list[:3]]
+        return [idx for score, (idx, pg) in sorted_list[:2]]
 
     def get_pg_list(self, article_id):
         return self._doc[article_id]
@@ -134,12 +135,12 @@ if __name__ == "__main__":
     df = preprocess(df)
     
     model_dir = Path("ckpt/bm25/")
-    model_name = "model_new_train_300.pkl"
+    model_name = "model_train_150.pkl"
 
     # Constuct new model
-    # dataset = Dataset(df, ws)
-    # model_dir.mkdir(parents=True, exist_ok=True)
-    # dataset.save(model_dir / model_name)
+    dataset = Dataset(df, ws)
+    model_dir.mkdir(parents=True, exist_ok=True)
+    dataset.save(model_dir / model_name)
     # exit()
     # Load existing model
     dataset = Dataset.from_pretrained(model_dir / model_name, ws)
@@ -158,10 +159,10 @@ if __name__ == "__main__":
 
             for idx in idx_list:
                 # idx_table[idx - 2] = 1
-                idx_table[idx - 1] = 2
+                # idx_table[idx - 1] = 2
                 idx_table[idx] = 1
-                idx_table[idx + 1] = 1
-                idx_table[idx + 2] = 3
+                # idx_table[idx + 1] = 1
+                # idx_table[idx + 2] = 3
 
         ret_pg = ""
         for ord in [1, 2, 3]:
@@ -178,9 +179,9 @@ if __name__ == "__main__":
             # print(len(ret_pg))
 
         df.loc[row_i, "text"] = ret_pg
-        if len(ret_pg) > 1000:
+        if len(ret_pg) > 490:
             print(row["question"])
             print(len(ret_pg))
             print(ret_pg)
 
-    df.to_json(data_dir / "processed_train_new_300_c3.json", orient="records", force_ascii=False, indent=4)
+    df.to_json(data_dir / "processed_train_150_r2_pg0.json", orient="records", force_ascii=False, indent=4)
