@@ -21,15 +21,15 @@ def train(args: argparse.Namespace) -> None:
     train_c3_df = read_c3(args.data_dir / "c3" / "train.json")
     dev_c3_df = read_c3(args.data_dir / "c3" / "dev.json")
     test_c3_df = read_c3(args.data_dir / "c3" / "test.json")
-    train_dream_df = pd.read_json(args.data_dir / "dream" / "train.json", orient="records")
-    dev_dream_df = pd.read_json(args.data_dir / "dream" / "dev.json", orient="records")
+    # train_dream_df = pd.read_json(args.data_dir / "dream" / "train.json", orient="records")
+    # dev_dream_df = pd.read_json(args.data_dir / "dream" / "dev.json", orient="records")
     c3_df = train_c3_df.append([dev_c3_df, test_c3_df])
-    dream_df = train_dream_df.append(dev_dream_df)
+    # dream_df = train_dream_df.append(dev_dream_df)
 
     rc_df = preprocess(rc_df)
     qa_df = preprocess(qa_df)
     c3_df = preprocess(c3_df)
-    dream_df = preprocess(dream_df)
+    # dream_df = preprocess(dream_df)
 
     valid_ratio = 0.1
     valid_rc_df = rc_df.sample(frac=valid_ratio, random_state=0)
@@ -42,17 +42,17 @@ def train(args: argparse.Namespace) -> None:
     valid_c3_df = c3_df.sample(frac=0.05, random_state=0)
     train_c3_df = c3_df.drop(valid_c3_df.index).reset_index(drop=True)
     valid_c3_df = valid_c3_df.reset_index(drop=True)
-    valid_dream_df = dream_df.sample(frac=0.05, random_state=0)
-    train_dream_df = dream_df.drop(valid_dream_df.index).reset_index(drop=True)
-    valid_dream_df = valid_dream_df.reset_index(drop=True)
+    # valid_dream_df = dream_df.sample(frac=0.05, random_state=0)
+    # train_dream_df = dream_df.drop(valid_dream_df.index).reset_index(drop=True)
+    # valid_dream_df = valid_dream_df.reset_index(drop=True)
     
     tokenizer = BertTokenizer.from_pretrained(args.model_name)
     train_qa_set = QADataset(train_qa_df, tokenizer, mode="train")
     valid_qa_set = QADataset(valid_qa_df, tokenizer, mode="valid")
     train_c3_set = QADataset(train_c3_df, tokenizer, mode="train")
     valid_c3_set = QADataset(valid_c3_df, tokenizer, mode="valid")
-    train_dream_set = QADataset(train_dream_df, tokenizer, mode="train")
-    valid_dream_set = QADataset(valid_dream_df, tokenizer, mode="valid")
+    # train_dream_set = QADataset(train_dream_df, tokenizer, mode="train")
+    # valid_dream_set = QADataset(valid_dream_df, tokenizer, mode="valid")
 
     # concat_dataset = ConcatDataset([train_qa_set, train_c3_set, train_dream_set])
     concat_dataset = ConcatDataset([train_qa_set, train_c3_set])
@@ -85,13 +85,13 @@ def train(args: argparse.Namespace) -> None:
         num_workers=16,
         pin_memory=True,
     )
-    valid_dream_loader = DataLoader(
-        valid_dream_set,
-        batch_size=args.batch_size*8,
-        shuffle=False,
-        num_workers=16,
-        pin_memory=True,
-    )
+    # valid_dream_loader = DataLoader(
+    #     valid_dream_set,
+    #     batch_size=args.batch_size*8,
+    #     shuffle=False,
+    #     num_workers=16,
+    #     pin_memory=True,
+    # )
 
     model = BertForMultipleChoice.from_pretrained(args.model_name)
     model.to(args.device)
@@ -196,8 +196,8 @@ def train(args: argparse.Namespace) -> None:
                     valid_loader = valid_qa_loader
                 elif task == "c3":
                     valid_loader = valid_c3_loader
-                else:
-                    valid_loader = valid_dream_loader
+                # else:
+                #     valid_loader = valid_dream_loader
                 for (
                     batch_idx,
                     (qa_input_ids, qa_token_type_ids, qa_attention_mask, qa_label),
@@ -229,9 +229,9 @@ def train(args: argparse.Namespace) -> None:
                 elif task == "c3":
                     valid_c3_loss = valid_loss
                     valid_c3_corrects = valid_corrects
-                else:
-                    valid_dream_loss = valid_loss
-                    valid_dream_corrects = valid_corrects
+                # else:
+                #     valid_dream_loss = valid_loss
+                #     valid_dream_corrects = valid_corrects
             
             valid_log = {
                 "valid_qa_loss": valid_qa_loss / len(valid_qa_loader),
