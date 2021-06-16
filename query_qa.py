@@ -125,17 +125,17 @@ if __name__ == "__main__":
     ws = init_ws(ckip_download_dir=Path("ckpt/ckip/"))
 
     data_dir = Path("data/qa/")
-    train_df = pd.read_json(data_dir / "train.json", orient="records")
+    # train_df = pd.read_json(data_dir / "train.json", orient="records")
     # train_df["article_id"] = train_df["article_id"].apply(lambda id: f"train_{id}")
-    # dev_df = pd.read_json(data_dir / "dev.json", orient="records")
+    dev_df = pd.read_json(data_dir / "dev.json", orient="records")
     # dev_df["article_id"] = dev_df["article_id"].apply(lambda id: f"dev_{id}")
     # df = train_df.append(dev_df)
-    df = train_df
-    # df = dev_df
+    # df = train_df
+    df = dev_df
     df = preprocess(df)
     
     model_dir = Path("ckpt/bm25/")
-    model_name = "model_train_150.pkl"
+    model_name = "model_dev_150.pkl"
 
     # Constuct new model
     dataset = Dataset(df, ws)
@@ -184,4 +184,4 @@ if __name__ == "__main__":
             print(len(ret_pg))
             print(ret_pg)
 
-    df.to_json(data_dir / "processed_train_150_r2_pg0.json", orient="records", force_ascii=False, indent=4)
+    df.to_json(data_dir / "processed_dev_150_r2_pg0.json", orient="records", force_ascii=False, indent=4)
