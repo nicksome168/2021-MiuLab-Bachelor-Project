@@ -7,7 +7,8 @@ from transformers import XLNetTokenizerFast
 
 class RiskClassificationDataset(Dataset):
     def __init__(self, df: DataFrame, tokenizer: XLNetTokenizerFast, mode: str):
-        df["label"] = df["label"].astype(int)
+        if mode == "train" or mode == "valid":
+            df["label"] = df["label"].astype(int)
         if mode == "train":
             add_list = []
             for i in range(len(df)):
