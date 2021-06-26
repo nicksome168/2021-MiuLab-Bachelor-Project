@@ -18,18 +18,18 @@ from dataset import QADataset
 def train(args: argparse.Namespace) -> None:
     rc_df = pd.read_csv(args.data_dir / "rc" / "train.csv", usecols=["article_id", "text", "label"])
     qa_df = pd.read_json(args.data_dir / "qa" / "processed_train_150_r2_pg0.json", orient="records")
-    train_c3_df = read_c3(args.data_dir / "c3" / "train.json")
-    dev_c3_df = read_c3(args.data_dir / "c3" / "dev.json")
-    test_c3_df = read_c3(args.data_dir / "c3" / "test.json")
-    # train_dream_df = pd.read_json(args.data_dir / "dream" / "train.json", orient="records")
-    # dev_dream_df = pd.read_json(args.data_dir / "dream" / "dev.json", orient="records")
-    c3_df = train_c3_df.append([dev_c3_df, test_c3_df])
-    # dream_df = train_dream_df.append(dev_dream_df)
+    # train_c3_df = read_c3(args.data_dir / "c3" / "train.json")
+    # dev_c3_df = read_c3(args.data_dir / "c3" / "dev.json")
+    # test_c3_df = read_c3(args.data_dir / "c3" / "test.json")
+    train_dream_df = pd.read_json(args.data_dir / "dream" / "train.json", orient="records")
+    dev_dream_df = pd.read_json(args.data_dir / "dream" / "dev.json", orient="records")
+    # c3_df = train_c3_df.append([dev_c3_df, test_c3_df])
+    dream_df = train_dream_df.append(dev_dream_df)
 
     rc_df = preprocess(rc_df)
     qa_df = preprocess(qa_df)
-    c3_df = preprocess(c3_df)
-    # dream_df = preprocess(dream_df)
+    # c3_df = preprocess(c3_df)
+    dream_df = preprocess(dream_df)
 
     valid_ratio = 0.1
     valid_rc_df = rc_df.sample(frac=valid_ratio, random_state=0)
@@ -39,23 +39,24 @@ def train(args: argparse.Namespace) -> None:
     train_qa_df = qa_df.drop(valid_qa_df.index).reset_index()
     valid_qa_df = valid_qa_df.reset_index()
 
-    valid_c3_df = c3_df.sample(frac=0.05, random_state=0)
-    train_c3_df = c3_df.drop(valid_c3_df.index).reset_index(drop=True)
-    valid_c3_df = valid_c3_df.reset_index(drop=True)
-    # valid_dream_df = dream_df.sample(frac=0.05, random_state=0)
-    # train_dream_df = dream_df.drop(valid_dream_df.index).reset_index(drop=True)
-    # valid_dream_df = valid_dream_df.reset_index(drop=True)
+    # valid_c3_df = c3_df.sample(frac=0.05, random_state=0)
+    # train_c3_df = c3_df.drop(valid_c3_df.index).reset_index(drop=True)
+    # valid_c3_df = valid_c3_df.reset_index(drop=True)
+    valid_dream_df = dream_df.sample(frac=0.05, random_state=0)
+    train_dream_df = dream_df.drop(valid_dream_df.index).reset_index(drop=True)
+    valid_dream_df = valid_dream_df.reset_index(drop=True)
     
     tokenizer = BertTokenizer.from_pretrained(args.model_name)
     train_qa_set = QADataset(train_qa_df, tokenizer, mode="train")
     valid_qa_set = QADataset(valid_qa_df, tokenizer, mode="valid")
-    train_c3_set = QADataset(train_c3_df, tokenizer, mode="train")
-    valid_c3_set = QADataset(valid_c3_df, tokenizer, mode="valid")
-    # train_dream_set = QADataset(train_dream_df, tokenizer, mode="train")
-    # valid_dream_set = QADataset(valid_dream_df, tokenizer, mode="valid")
+    # train_c3_set = QADataset(train_c3_df, tokenizer, mode="train")
+    # valid_c3_set = QADataset(valid_c3_df, tokenizer, mode="valid")
+    train_dream_set = QADataset(train_dream_df, tokenizer, mode="train")
+    valid_dream_set = QADataset(valid_dream_df, tokenizer, mode="valid")
 
     # concat_dataset = ConcatDataset([train_qa_set, train_c3_set, train_dream_set])
-    concat_dataset = ConcatDataset([train_qa_set, train_c3_set])
+    # concat_dataset = ConcatDataset([train_qa_set, train_c3_set])
+    concat_dataset = ConcatDataset([train_qa_set, train_dream_set])
     train_qa_loader = DataLoader(
         # train_qa_set,
         concat_dataset,
@@ -64,13 +65,13 @@ def train(args: argparse.Namespace) -> None:
         num_workers=16,
         pin_memory=True,
     )
-    train_c3_loader = DataLoader(
-        train_c3_set,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=16,
-        pin_memory=True,
-    )
+    # train_c3_loader = DataLoader(
+    #     train_c3_set,
+    #     batch_size=args.batch_size,
+    #     shuffle=True,
+    #     num_workers=16,
+    #     pin_memory=True,
+    # )
     valid_qa_loader = DataLoader(
         valid_qa_set,
         batch_size=args.batch_size*8,
@@ -78,20 +79,20 @@ def train(args: argparse.Namespace) -> None:
         num_workers=16,
         pin_memory=True,
     )
-    valid_c3_loader = DataLoader(
-        valid_c3_set,
-        batch_size=args.batch_size*8,
-        shuffle=False,
-        num_workers=16,
-        pin_memory=True,
-    )
-    # valid_dream_loader = DataLoader(
-    #     valid_dream_set,
+    # valid_c3_loader = DataLoader(
+    #     valid_c3_set,
     #     batch_size=args.batch_size*8,
     #     shuffle=False,
     #     num_workers=16,
     #     pin_memory=True,
     # )
+    valid_dream_loader = DataLoader(
+        valid_dream_set,
+        batch_size=args.batch_size*8,
+        shuffle=False,
+        num_workers=16,
+        pin_memory=True,
+    )
 
     model = BertForMultipleChoice.from_pretrained(args.model_name)
     model.to(args.device)
@@ -114,20 +115,21 @@ def train(args: argparse.Namespace) -> None:
         model.train()
         optimizer.zero_grad()
         train_qa_loss = 0
-        train_c3_loss = 0
+        # train_c3_loss = 0
         train_qa_corrects = 0
-        train_c3_corrects = 0
+        # train_c3_corrects = 0
         train_qa_iter = iter(train_qa_loader)
-        train_c3_iter = iter(train_c3_loader)
+        # train_c3_iter = iter(train_c3_loader)
         for batch_idx in tqdm(range(len(train_qa_loader))):
             # for task in ["c3", "qa"]:
             for task in ["qa"]:
                 if task == "c3":
-                    try:
-                        qa_input_ids, qa_token_type_ids, qa_attention_mask, qa_label = next(train_c3_iter)
-                    except StopIteration:
-                        train_c3_iter = iter(train_c3_loader)
-                        qa_input_ids, qa_token_type_ids, qa_attention_mask, qa_label = next(train_c3_iter)
+                    pass
+                    # try:
+                    #     qa_input_ids, qa_token_type_ids, qa_attention_mask, qa_label = next(train_c3_iter)
+                    # except StopIteration:
+                    #     train_c3_iter = iter(train_c3_loader)
+                    #     qa_input_ids, qa_token_type_ids, qa_attention_mask, qa_label = next(train_c3_iter)
                 else:
                     try:
                         qa_input_ids, qa_token_type_ids, qa_attention_mask, qa_label = next(train_qa_iter)
@@ -155,9 +157,10 @@ def train(args: argparse.Namespace) -> None:
                 scaler.scale(qa_loss).backward()
 
                 if task == "c3":
-                    train_c3_loss += qa_loss
-                    qa_pred = torch.argmax(qa_logits, dim=1)
-                    train_c3_corrects += torch.sum(qa_pred == qa_label)
+                    pass
+                    # train_c3_loss += qa_loss
+                    # qa_pred = torch.argmax(qa_logits, dim=1)
+                    # train_c3_corrects += torch.sum(qa_pred == qa_label)
                 else:
                     train_qa_loss += qa_loss
                     qa_pred = torch.argmax(qa_logits, dim=1)
@@ -170,11 +173,11 @@ def train(args: argparse.Namespace) -> None:
 
         n_updates = len(train_qa_loader) / args.n_batch_per_step
         train_qa_loss /= args.n_qa_per_rc
-        train_c3_loss /= args.n_qa_per_rc
+        # train_c3_loss /= args.n_qa_per_rc
         train_qa_corrects = train_qa_corrects / args.n_qa_per_rc
-        train_c3_corrects = train_c3_corrects / args.n_qa_per_rc
+        # train_c3_corrects = train_c3_corrects / args.n_qa_per_rc
         train_log = {
-            "train_loss": (train_qa_loss + train_c3_loss) / n_updates,
+            "train_loss": (train_qa_loss) / n_updates,
             "train_acc": train_qa_corrects / len(concat_dataset),
             # "train_qa_loss": train_qa_loss / n_updates,
             # "train_c3_loss": train_c3_loss / n_updates,
@@ -189,15 +192,15 @@ def train(args: argparse.Namespace) -> None:
         with torch.no_grad():
             model.eval()
             # for task in ["qa", "c3", "dream"]:
-            for task in ["qa", "c3"]:
+            for task in ["qa", "dream"]:
                 valid_loss = 0
                 valid_corrects = 0
                 if task == "qa":
                     valid_loader = valid_qa_loader
-                elif task == "c3":
-                    valid_loader = valid_c3_loader
-                # else:
-                #     valid_loader = valid_dream_loader
+                # elif task == "c3":
+                #     valid_loader = valid_c3_loader
+                else:
+                    valid_loader = valid_dream_loader
                 for (
                     batch_idx,
                     (qa_input_ids, qa_token_type_ids, qa_attention_mask, qa_label),
@@ -226,20 +229,20 @@ def train(args: argparse.Namespace) -> None:
                 if task == "qa":
                     valid_qa_loss = valid_loss
                     valid_qa_corrects = valid_corrects
-                elif task == "c3":
-                    valid_c3_loss = valid_loss
-                    valid_c3_corrects = valid_corrects
-                # else:
-                #     valid_dream_loss = valid_loss
-                #     valid_dream_corrects = valid_corrects
+                # elif task == "c3":
+                #     valid_c3_loss = valid_loss
+                #     valid_c3_corrects = valid_corrects
+                else:
+                    valid_dream_loss = valid_loss
+                    valid_dream_corrects = valid_corrects
             
             valid_log = {
                 "valid_qa_loss": valid_qa_loss / len(valid_qa_loader),
-                "valid_c3_loss": valid_c3_loss / len(valid_c3_loader),
-                # "valid_dream_loss": valid_dream_loss / len(valid_dream_loader),
+                # "valid_c3_loss": valid_c3_loss / len(valid_c3_loader),
+                "valid_dream_loss": valid_dream_loss / len(valid_dream_loader),
                 "valid_qa_acc": valid_qa_corrects / len(valid_qa_set),
-                "valid_c3_acc": valid_c3_corrects / len(valid_c3_set),
-                # "valid_dream_acc": valid_dream_corrects / len(valid_dream_set),
+                # "valid_c3_acc": valid_c3_corrects / len(valid_c3_set),
+                "valid_dream_acc": valid_dream_corrects / len(valid_dream_set),
             }
             for key, value in valid_log.items():
                 print(f"{key:30s}: {value:.4}")

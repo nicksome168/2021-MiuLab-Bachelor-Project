@@ -7,9 +7,10 @@ import pandas as pd
 import torch
 
 
-def handle_reproducibility(is_reproducible: bool = True) -> None:
+def handle_reproducibility(is_reproducible: bool = True, rand_seed: int = 0) -> None:
     if is_reproducible:
-        torch.manual_seed(0)
+        print(f'random seed {rand_seed}')
+        torch.manual_seed(rand_seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
