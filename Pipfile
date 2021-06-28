@@ -12,6 +12,8 @@ sklearn = "*"
 ckiptagger = "==0.2.1"
 tensorflow-cpu = "==2.4.1"
 pipfile = "*"
+typing-extensions = "*"
+wandb = "*"
 
 [dev-packages]
 wandb = "*"
