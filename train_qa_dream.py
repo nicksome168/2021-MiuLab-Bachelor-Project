@@ -13,7 +13,7 @@ from torch.cuda.amp import GradScaler, autocast
 
 from utils import handle_reproducibility, preprocess, read_c3
 from dataset import QADataset
-
+from model import QAModel
 
 def train(args: argparse.Namespace) -> None:
     rc_df = pd.read_csv(args.data_dir / "rc" / "train.csv", usecols=["article_id", "text", "label"])
@@ -62,39 +62,42 @@ def train(args: argparse.Namespace) -> None:
         concat_dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=16,
+        num_workers=2,
         pin_memory=True,
     )
     # train_c3_loader = DataLoader(
     #     train_c3_set,
     #     batch_size=args.batch_size,
     #     shuffle=True,
-    #     num_workers=16,
+    #     num_workers=2,
     #     pin_memory=True,
     # )
     valid_qa_loader = DataLoader(
         valid_qa_set,
         batch_size=args.batch_size*8,
         shuffle=False,
-        num_workers=16,
+        num_workers=2,
         pin_memory=True,
     )
     # valid_c3_loader = DataLoader(
     #     valid_c3_set,
     #     batch_size=args.batch_size*8,
     #     shuffle=False,
-    #     num_workers=16,
+    #     num_workers=2,
     #     pin_memory=True,
     # )
     valid_dream_loader = DataLoader(
         valid_dream_set,
         batch_size=args.batch_size*8,
         shuffle=False,
-        num_workers=16,
+        num_workers=2,
         pin_memory=True,
     )
 
-    model = BertForMultipleChoice.from_pretrained(args.model_name)
+    if args.add_duma:
+        model = QAModel(args.model_name)
+    else:
+        model = BertForMultipleChoice.from_pretrained(args.model_name)
     model.to(args.device)
 
     optimizer = AdamW(model.parameters(), lr=args.lr)
@@ -279,6 +282,7 @@ def parse_args() -> argparse.Namespace:
 
     # model
     parser.add_argument("--model_name", type=str, default="hfl/chinese-macbert-large")
+    parser.add_argument("--add_duma", action="store_true")
 
     # optimizer
     parser.add_argument("--lr", type=float, default=3e-5)
@@ -290,12 +294,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rand_seed", type=int, default=0)
     parser.add_argument("--device", type=torch.device, default="cuda:0")
     parser.add_argument("--n_epoch", type=int, default=50)
-    parser.add_argument("--n_batch_per_step", type=int, default=16)
+    parser.add_argument("--n_batch_per_step", type=int, default=2)
     parser.add_argument("--n_qa_per_rc", type=int, default=1)
     parser.add_argument("--metric_for_best", type=str, default="valid_qa_acc")
 
     # logging
-    parser.add_argument("--wandb_logging", type=bool, default=True)
+    parser.add_argument("--wandb_logging", action="store_true")
     parser.add_argument("--exp_name", type=str, default="mac-qa-catc3-150-r2-pg0")
     # parser.add_argument("--exp_name", type=str, default="test")
 
