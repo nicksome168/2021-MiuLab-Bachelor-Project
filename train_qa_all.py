@@ -96,9 +96,10 @@ def train(args: argparse.Namespace) -> None:
 
     if args.add_duma:
         print('add duma...')
-        print(f'loading ckpt {args.ckpt}')
         model = QAModel(args.model_name)
-        model.load_state_dict(torch.load(args.ckpt))
+        if args.ckpt != '':
+            print(f'loading ckpt {args.ckpt}')
+            model.load_state_dict(torch.load(args.ckpt))
     else:
         model = BertForMultipleChoice.from_pretrained(args.model_name)
     model.to(args.device)
@@ -268,7 +269,7 @@ def parse_args() -> argparse.Namespace:
 
     # model
     parser.add_argument("--model_name", type=str, default="hfl/chinese-macbert-large")
-    parser.add_argument("--ckpt", type=str, default="ckpt/mt/best_model_qa_c3_dream_duma_1.pt")
+    parser.add_argument("--ckpt", type=str, default="")
     parser.add_argument("--add_duma", action="store_true")
     
     # optimizer
