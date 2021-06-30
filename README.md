@@ -80,3 +80,10 @@
     -   The program saves the best model by the accuracy of validation data (can be changed by `--metric_for_best`).
     -   Model will be saved in `--ckpt_dir` (default: `ckpt/qa`).
     -   Training uses `cuda:0` by default (can be changed by `--device`), and note that using `cpu` is not tested.
+
+## Analysis
+
+-   Visualization
+    -   use `attn_visual.ipynb` to check what model learns in each layer and head
+-   Error analysis
+    -   use `error_analysis.ipynb` to analyze wrong answers
